@@ -20,7 +20,6 @@ contract GaslessTokenTransfer{
         address to;
         uint256 value; // For ERC20: amount, for ERC721: tokenId
         uint256 nonce;
-        uint256 chainId;
     }
 
     mapping(address => uint256) private nonces;
@@ -46,7 +45,7 @@ contract GaslessTokenTransfer{
             request.to, 
             request.value, 
             request.nonce,
-            request.chainId
+            block.chainid
         ));
 
         // Add the EIP-191 prefix and recover the signer

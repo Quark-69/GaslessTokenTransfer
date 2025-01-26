@@ -9,17 +9,16 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 contract GaslessTokenTransfer{
     using ECDSA for bytes32;
 
-    // Enum to distinguish token types
     enum TokenType { ERC20, ERC721 }
 
-    // Struct to encapsulate transfer details
     struct TransferRequest {
         TokenType tokenType;
         address tokenContract;
         address from;
         address to;
-        uint256 value; // For ERC20: amount, for ERC721: tokenId
+        uint256 value;
         uint256 nonce;
+        uint256 chainId;
     }
 
     mapping(address => uint256) private nonces;
@@ -48,20 +47,15 @@ contract GaslessTokenTransfer{
             block.chainid
         ));
 
-        // Add the EIP-191 prefix and recover the signer
-        // bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
         address signer = ECDSA.recover(
             MessageHashUtils.toEthSignedMessageHash(messageHash),
             signature
         );
 
-        // Verify that the signer is the same as the "from" address
         require(signer == request.from, "Invalid signature");
 
-        // Increment the nonce to prevent replay attacks
         nonces[request.from]++;
 
-        // Perform transfer based on token type
         if (request.tokenType == TokenType.ERC20) {
             // ERC20 transfer
             IERC20 token = IERC20(request.tokenContract);

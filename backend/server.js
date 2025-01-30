@@ -1,30 +1,65 @@
-require('dotenv').config({ path: '.env' });
-const { ethers } = require('ethers');
-const express = require('express');
+const express = require("express");
+const { ethers } = require("ethers");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const hardhat = require("hardhat");
+
+dotenv.config();
+
 const app = express();
-const port = 3000;
+app.use(express.json());
+app.use(cors());
 
-// Access environment variables
-const infuraProjectId = process.env.INFURA_PROJECT_ID;
-const contractAddress = process.env.CONTRACT_ADDRESS;
-const contractAbi = JSON.parse(Buffer.from(process.env.CONTRACT_ABI, "base64").toString("utf-8"));
+const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+const wallet = new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, provider);
 
-// Setup ethers
-const provider = new ethers.JsonRpcProvider(`https://holesky.infura.io/v3/${infuraProjectId}`);
-// Connect to the smart contract
-const contract = new ethers.Contract(contractAddress, contractAbi, provider);
-
-// Example API endpoint to interact with the smart contract
-app.get('/api/contract-data', async (req, res) => {
+const relayTransaction = async (req, res) => {
     try {
-        const data = await contract.yourContractMethod();
-        res.json(data);
+        const { transferRequest, signature } = req.body;
+        const { tokenType, tokenContract, from, to, value, deadline } = transferRequest;
+
+        // Load contract
+        const relayContract = await hardhat.ethers.getContractAt("GaslessTokenTransfer", process.env.GASLESS_ADDRESS, wallet);
+
+        const request = {
+            tokenType,
+            tokenContract,
+            from,
+            to,
+            value,
+            deadline
+        }
+
+        const tx = await relayContract.metaTransfer(request, signature);
+
+        const receipt = await tx.wait();
+        res.json({ success: true, txHash: tx.hash });
     } catch (error) {
-        res.status(500).send(error.toString());
+        res.status(500).json({ success: false, error: error.message });
     }
-});
+};
 
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-});
+const gaslessAddr = async (req, res) => {
+    res.send(process.env.GASLESS_ADDRESS);
+}
 
+const gaslessAbi = async (req, res) => {
+    res.send(process.env.GASLESS_ABI);
+}
+
+const erc20abi = async (req, res) => {
+    res.send(process.env.MockERC20_ABI);
+}
+
+const erc721abi = async (req, res) => {
+    res.send(process.env.MockERC721_ABI);
+}
+
+app.post("/relay", relayTransaction);
+app.get("/gasless-addr", gaslessAddr);
+app.get("/gasless-abi", gaslessAbi);
+app.get("/erc20-abi", erc20abi);
+app.get("/erc721-abi", erc721abi);
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

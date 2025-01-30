@@ -2,14 +2,17 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "./MockERC20.sol";
+import "./MockERC721.sol";
 
-contract GaslessTokenTransfer{
-    using ECDSA for bytes32;
+contract GaslessTokenTransfer {
 
-    enum TokenType { ERC20, ERC721 }
+    enum TokenType {
+        ERC20,
+        ERC721
+    }
 
     struct TransferRequest {
         TokenType tokenType;
@@ -17,53 +20,45 @@ contract GaslessTokenTransfer{
         address from;
         address to;
         uint256 value;
-        uint256 nonce;
-        uint256 chainId;
+        uint256 deadline;
     }
 
-    mapping(address => uint256) private nonces;
-
-    /**
-     * @dev Perform a gasless token transfer via meta-transaction
-     * @param request Transfer request details
-     * @param signature Signature from the sender authorizing the transfer
-     */
     function metaTransfer(
-        TransferRequest memory request, 
+        TransferRequest memory request,
         bytes memory signature
     ) external {
 
-        // Ensure the nonce is valid and not used
-        require(nonces[request.from] == request.nonce, "Invalid nonce");
-
-        // Create the hash of the transaction details
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            request.tokenType,
-            request.tokenContract,
-            request.from, 
-            request.to, 
-            request.value, 
-            request.nonce,
-            block.chainid
-        ));
-
-        address signer = ECDSA.recover(
-            MessageHashUtils.toEthSignedMessageHash(messageHash),
-            signature
-        );
-
-        require(signer == request.from, "Invalid signature");
-
-        nonces[request.from]++;
-
-        if (request.tokenType == TokenType.ERC20) {
+        if(request.tokenType == TokenType.ERC20)
+        {
             // ERC20 transfer
-            IERC20 token = IERC20(request.tokenContract);
-            require(token.transferFrom(request.from, request.to, request.value), "ERC20 transfer failed");
-        } else {
-            // ERC721 transfer
-            IERC721 token = IERC721(request.tokenContract);
+            MockERC20 token = MockERC20(request.tokenContract);
+            token.permit(
+                request.from,
+                address(this),
+                request.value,
+                request.deadline,
+                signature
+            );
+            require(
+                token.transferFrom(request.from, request.to, request.value),
+                "ERC20 transfer failed"
+            );
+        }
+        else
+        {
+            MockERC721 token = MockERC721(request.tokenContract);
+            token.permit(
+                request.from,
+                address(this),
+                request.value,
+                request.deadline,
+                signature
+            );
             token.transferFrom(request.from, request.to, request.value);
         }
+    }
+
+    function getChainId() external view returns (uint256) {
+        return block.chainid;
     }
 }

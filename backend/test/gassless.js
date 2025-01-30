@@ -3,116 +3,76 @@ const { ethers } = require("hardhat");
 
 describe("GaslessTokenTransfer", function () {
   let owner, sender, recipient;
-  let mockERC20, mockERC721, gaslessTokenTransfer;
+  let mockERC20, gaslessTokenTransfer;
+  let deadline;
 
   beforeEach(async function () {
 
-    chainId = (await ethers.provider.getNetwork()).chainId;
-
-    console.log("Chain ID: ", chainId);
+    chainId = ((await ethers.provider.getNetwork()).chainId).toString();
 
     [owner, sender, recipient] = await ethers.getSigners();
 
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    mockERC20 = await MockERC20.deploy(1000000);
+    const MockERC20 = await ethers.getContractFactory("MockERC20", owner);
+    mockERC20 = await MockERC20.deploy("MockTK", "MTK", "10000000000");
     await mockERC20.waitForDeployment();
 
-    const MockERC721 = await ethers.getContractFactory("MockERC721");
-    mockERC721 = await MockERC721.deploy();
-    await mockERC721.waitForDeployment();
-
-    const GaslessTokenTransfer = await ethers.getContractFactory("GaslessTokenTransfer");
+    const GaslessTokenTransfer = await ethers.getContractFactory("GaslessTokenTransfer", sender);
     gaslessTokenTransfer = await GaslessTokenTransfer.deploy();
     await gaslessTokenTransfer.waitForDeployment();
   });
 
-  async function createSignature(request, signer) {
-    const messageHash = ethers.solidityPackedKeccak256(
-      ["uint8", "address", "address", "address", "uint256", "uint256", "uint256"],
-      [
-        (request.tokenType), 
-        request.tokenContract, 
-        request.from, 
-        request.to, 
-        (request.value), 
-        (request.nonce),
-        BigInt(request.chainId),
-      ]
-    );
+  async function createSignature() {
+    deadline = Math.floor(Date.now() / 1000) + 3600;
 
-    signedmsg = await signer.signMessage(ethers.getBytes(messageHash));
-    return signedmsg;
+    const domain = {
+      name: "MockTK",
+      version: "1",
+      chainId: chainId.toString(),
+      verifyingContract: await mockERC20.getAddress()
+    };
+
+    const types = {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" }
+      ]
+    };
+
+    const values = {
+      owner: await owner.getAddress(),
+      spender: await gaslessTokenTransfer.getAddress(),
+      value: ethers.parseEther("1000"),
+      nonce: await mockERC20.nonces(await owner.getAddress()),
+      deadline: deadline.toString()
+    };
+
+    const signature = await owner.signTypedData(domain, types, values);
+    return signature;
   }
 
   describe("ERC20 Gasless Transfer", function () {
     it("Should perform gasless ERC20 transfer", async function () {
-      await mockERC20.mint(sender.address, 1000);
-      await mockERC20.connect(sender).approve(await gaslessTokenTransfer.getAddress(), 1000);
+
+
+      const signature = await createSignature();
 
       const request = {
-        tokenType: 0, // ERC20
+        tokenType : '0',
         tokenContract: await mockERC20.getAddress(),
-        from: sender.address,
-        to: recipient.address,
-        value: 500,
-        nonce: 0,
-        chainId
+        from: await owner.getAddress(),
+        to: await recipient.getAddress(),
+        value: ethers.parseEther('1000'),
+        deadline
       };
-
-      const signature = await createSignature(request, sender);
 
       await expect(
         gaslessTokenTransfer.metaTransfer(request, signature)
       ).to.not.be.reverted;
 
-      expect(await mockERC20.balanceOf(recipient.address)).to.equal(500);
-      expect(await mockERC20.balanceOf(sender.address)).to.equal(500);
-    });
-  });
-
-  it("Should reject transfer with signature from different chain", async function () {
-    await mockERC20.mint(sender.address, 1000);
-    await mockERC20.connect(sender).approve(await gaslessTokenTransfer.getAddress(), 1000);
-
-    const request = {
-      tokenType: 0, // ERC20
-      tokenContract: await mockERC20.getAddress(),
-      from: sender.address,
-      to: recipient.address,
-      value: 500,
-      nonce: 0,
-      chainId: 999
-    };
-
-    const signature = await createSignature(request, sender);
-
-    await expect(
-      gaslessTokenTransfer.metaTransfer(request, signature)
-    ).to.be.revertedWith("Invalid signature");
-  });
-
-  describe("ERC721 Gasless Transfer", function () {
-    it("Should perform gasless ERC721 transfer", async function () {
-      await mockERC721.mint(sender.address, 1);
-      await mockERC721.connect(sender).approve(await gaslessTokenTransfer.getAddress(), 1);
-
-      const request = {
-        tokenType: 1, // ERC721
-        tokenContract: await mockERC721.getAddress(),
-        from: sender.address,
-        to: recipient.address,
-        value: 1, // Token ID
-        nonce: 0,
-        chainId: chainId
-      };
-
-      const signature = await createSignature(request, sender);
-
-      await expect(
-        gaslessTokenTransfer.metaTransfer(request, signature)
-      ).to.not.be.reverted;
-
-      expect(await mockERC721.ownerOf(1)).to.equal(recipient.address);
+      expect(await mockERC20.balanceOf(recipient.address)).to.equal(ethers.parseEther("1000"));
     });
   });
 

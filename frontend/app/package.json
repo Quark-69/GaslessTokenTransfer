@@ -15,6 +15,9 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "ethers": "^6.13.5"
+    "autoprefixer": "^10.4.20",
+    "ethers": "^6.13.5",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17"
   }
 }

@@ -57,7 +57,7 @@ export default function Home() {
         from: account,
         to,
         value : tokType === 0 ? (ethers.parseEther(value.toString())).toString() : value.toString(),
-        deadline
+        deadline : deadline.toString()
       };
 
       const signature = await createSignature(signer, tokType, tokenContract, value, deadline);

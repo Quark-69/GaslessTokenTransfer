@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "./MockERC20.sol";
@@ -46,15 +45,16 @@ contract GaslessTokenTransfer {
         }
         else
         {
+            // ERC721 transfer
             MockERC721 token = MockERC721(request.tokenContract);
             token.permit(
-                request.from,
                 address(this),
                 request.value,
                 request.deadline,
                 signature
             );
-            token.transferFrom(request.from, request.to, request.value);
+            
+            token.safeTransferFrom(request.from, request.to, request.value);
         }
     }
 

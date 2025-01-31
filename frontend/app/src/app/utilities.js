@@ -30,27 +30,46 @@ export async function createSignature(owner, tokenType, tokenContractAddress, va
     verifyingContract: verifyingContract
   };
 
-  console.log(domain);
+  let types, values;
 
-  const types = {
-    Permit: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint256" }
-    ]
-  };
+  if (tokenType === 0) {
+    types = {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" }
+      ]
+    };
 
-  const values = {
-    owner: await owner.getAddress(),
-    spender: await gaslessContract.getAddress(),
-    value: tokenType === 0 ? (ethers.parseEther(value.toString())).toString() : value.toString(),
-    nonce: await tokenContract.nonces(await owner.getAddress()),
-    deadline: deadline.toString()
-  };
+    values = {
+      owner: await owner.getAddress(),
+      spender: await gaslessContract.getAddress(),
+      value: (ethers.parseEther(value.toString())).toString(),
+      nonce: (await tokenContract.nonces(await owner.getAddress())).toString(),
+      deadline: deadline.toString()
+    };
+  }
+  else
+  {
+    types = {
+      Permit: [
+          { name: "spender", type: "address" },
+          { name: "tokenId", type: "uint256" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+      ],
+    };
 
-  console.log(values);
+    values = {
+      spender: await gaslessContract.getAddress(),
+      tokenId: value.toString(),
+      nonce: (await tokenContract.nonces(value.toString())).toString(),
+      deadline: deadline.toString()
+    };
+  }
+
 
   const signature = await owner.signTypedData(domain, types, values);
   return signature;

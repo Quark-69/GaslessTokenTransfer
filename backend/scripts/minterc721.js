@@ -6,7 +6,7 @@ async function main() {
 
 
     const Contract = await ethers.getContractFactory("MockERC721");
-    const contract = await Contract.deploy("xhut", "XT");
+    const contract = await Contract.deploy("kok", "KK");
   
     console.log("Contract deployed to address:", contract.target);
   }

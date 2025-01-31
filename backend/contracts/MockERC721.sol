@@ -9,13 +9,11 @@ contract MockERC721 is ERC721, EIP712 {
     uint256 private _lastTokenId;
 
     // Mapping of nonces for each address
-    mapping(address => uint256) public nonces;
+    mapping(uint256 => uint256) public nonces;
 
     // EIP-712 typehash for the permit function
     bytes32 private constant TYPE_HASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256("Permit(address spender,uint256 tokenId,uint256 nonce,uint256 deadline)");
 
     constructor(
         string memory name,
@@ -27,9 +25,8 @@ contract MockERC721 is ERC721, EIP712 {
     }
 
     function permit(
-        address owner,
         address spender,
-        uint256 value,
+        uint256 tokenId,
         uint256 deadline,
         bytes memory signature
     ) external {
@@ -39,10 +36,9 @@ contract MockERC721 is ERC721, EIP712 {
         bytes32 structHash = keccak256(
             abi.encode(
                 TYPE_HASH,
-                owner,
                 spender,
-                value,
-                nonces[owner]++,
+                tokenId,
+                nonces[tokenId]++,
                 deadline
             )
         );
@@ -50,10 +46,11 @@ contract MockERC721 is ERC721, EIP712 {
 
         // Recover signer address
         address signer = ECDSA.recover(digest, signature);
-        require(signer == owner, "Invalid signature");
+
+        require(signer == ownerOf(tokenId), "Invalid signature");
 
         // Approve the spending
-        approve(spender, value);
+        _approve(spender, tokenId, signer);
     }
 
     function getDomainSeparator() external view returns (bytes32) {

@@ -16,21 +16,11 @@ const wallet = new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, provider);
 const relayTransaction = async (req, res) => {
     try {
         const { transferRequest, signature } = req.body;
-        const { tokenType, tokenContract, from, to, value, deadline } = transferRequest;
 
         // Load contract
         const relayContract = await hardhat.ethers.getContractAt("GaslessTokenTransfer", process.env.GASLESS_ADDRESS, wallet);
 
-        const request = {
-            tokenType,
-            tokenContract,
-            from,
-            to,
-            value,
-            deadline
-        }
-
-        const tx = await relayContract.metaTransfer(request, signature);
+        const tx = await relayContract.metaTransfer(transferRequest, signature);
 
         const receipt = await tx.wait();
         res.json({ success: true, txHash: tx.hash });
